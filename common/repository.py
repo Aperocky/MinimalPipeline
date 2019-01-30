@@ -18,13 +18,9 @@ class Repository:
 
     # Create repository when it doesn't exist (first run)
     def create_repository(self):
-        try:
-            os.mkdir(self.location)
-        except:
-            raise FileExistsError("This repository already exist")
+        ut.create_dir(location)
         record = {"upstream": [], "local": []}
         pickle.dump(record, open(self.indexes, 'rb'))
-
         
 
     def load_index(self):

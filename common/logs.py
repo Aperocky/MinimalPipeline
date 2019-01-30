@@ -5,7 +5,7 @@ from . import envs
 # Get a logger.
 def get_logger(name):
     root_ = os.environ["pipeline_path"]
-    log_dir_path = envs.get_env_var("logging", "logging_dir_path")    
+    log_dir_path = envs.get_env_var("paths", "logging_dir_path")    
     log_path = os.path.join(root_, log_dir_path)
     log_file = os.path.join(log_path, "log_0.log") # This file will be bumped when full.
     logger = logging.getLogger(name)

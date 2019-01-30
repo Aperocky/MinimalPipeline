@@ -1,15 +1,17 @@
 import os, sys
 import shutil
 import configparser
-from . import logs
+import uuid
+from . import logs, envs
 
 logger = logs.get_logger(__name__)
+root_path = os.environ["pipeline_path"]
 
 # Helper function dealing with file systems and others.
 
+# This function removes a certain path recursively.
 def remove_path(path, project=True):
     if project:
-        root_path = os.environ["pipeline_path"]
         path = os.path.join(root_path, path)
     if os.path.isdir(path):
         logger.info("Removing directory {} recursively".format(path))
@@ -19,12 +21,26 @@ def remove_path(path, project=True):
         os.remove(path)
     else:
         logger.warning("{} does not exist".format(path))
+
+
+# This function creates an empty directory.
+def create_dir(path, project=True):
+    if project:
+        path = os.path.join(root_path, path)
+    if os.path.exists(path):
+        logger.error("File already exists")
+        raise FileExistsError("File already exists")
+    else:
+        logger.info("Creating empty directory {}".format(path))
+        os.mkdir(path)
         
-def get_env_var(section, specific):
-    project_dir = os.environ["pipeline_path"]
-    envs_path = os.path.join(project_dir, 'environment/envs.ini')
-    envs = configparser.configParser()
-    envs.read(envs_path)
-    return envs.get(section, specific)
-  
+
+# Creates random temp directory to process tasks in isolated environments.
+def create_temp_dir(path=""):
+    if not path:
+        path = envs.get_env_var("paths", "temp_dir_path")
+    temp_path = uuid.uuid4()
+    path = os.path.join(root_path, path, temp_path)
+    logger.info("Creating temp directory {}".format(path))
+    create_dir(path)
 
