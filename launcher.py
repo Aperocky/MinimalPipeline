@@ -19,8 +19,8 @@ class Launcher:
         config = cfg.ConfigParser()
         config.read(self.config_path)
         self.config = config
-        module_path = config.get("source_path", "module")
-        class_name = config.get("source_path", "class")
+        module_path = config.get("source_path", "module") # common.repository
+        class_name = config.get("source_path", "class") # "Repository"
         task_module = importlib.import_module(module_path)
         task_class = getattr(task_module, class_name)
         self.task_instance = task_class()
@@ -37,8 +37,9 @@ class Launcher:
         
     def run(self):
         # TODO: running files determined on record pickle file.
+        pass
 
-
+print(Repository("task_1"))
 
 
             

@@ -1,4 +1,6 @@
 logs/
+repositories/
 tests/
 *.pyc
 **/__pycache__/
+**/*.swp
