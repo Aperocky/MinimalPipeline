@@ -27,22 +27,24 @@ class Launcher:
 
     # Fill the repository (paths) for the task to be executed
     def initiate_repository(self):
-        upstream_paths = list(config.items("upstream_path"))
-        local_path = config.get("local_path", "repository_path")
+        for section in config.sections():
+            if section.startswith("input"):
+                upstream = config.get(section, "repository_path")
+                self.repos["upstream"].append(Repository(upstream))
+        local_path = config.get("output", "repository_path")
         self.repos["upstream"] = []
-        self.repos["local"] = None
-        for upstream in upstream_paths:
-            self.repos["upstream"].append(Repository(upstream))
         self.repos["local"] = Repository(local_path)
         
     def run(self):
         # TODO: running files determined on record pickle file.
+        if not self.runnable():
+            logger.info("Not runnable for this iteration, quitting")
         pass
 
-print(Repository("task_1"))
+    def runnable(self):
+        # TODO: extract the record.tab file for each repository.
+        pass
 
-
-            
 
 
 
