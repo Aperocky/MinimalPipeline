@@ -43,4 +43,18 @@ def create_temp_dir(path=""):
     path = os.path.join(root_path, path, temp_path)
     logger.info("Creating temp directory {}".format(path))
     create_dir(path)
+    return path
+
+def copy_directory(from_path, to_path, overwrite=False):
+    if not os.path.isdir(from_path):
+        logger.error("Copied directory does not exist")
+        raise FileNotFoundError("Source directory does not exist")
+    if os.path.isdir(to_path):
+        if not overwrite:
+            logger.error("Destination directory already exist")
+            raise FileExistsError("Destination exists")
+        else:
+            remove_path(to_path)
+    logger.info("Copying directory {} to {}".format(from_path, to_path))
+    shutil.copytree(from_path, to_path)
 

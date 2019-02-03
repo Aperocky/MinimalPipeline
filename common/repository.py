@@ -23,6 +23,7 @@ invisible and irrelevant to the Repository class.
 class Repository:
 
     def __init__(self, name):
+        self.name = name
         location = envs.get_env_var("paths", "repository_path") 
         self.location = os.path.join(os.environ["pipeline_path"], location, name)
         self.indexes = os.path.join(self.location, "record.tab")
@@ -37,15 +38,31 @@ class Repository:
         logger.info("Creating repository {} as it previously didn't exist".format(self.location))
         ut.create_dir(self.location)
         ut.create_dir(os.path.join(self.location, "blocks"))
-        record = {"upstream": [], "local": []}
+        record = {"upstream": {}, "local": []}
         pickle.dump(record, open(self.indexes, 'wb'))
 
     def load_index(self):
+        if self.read_locked():
+            logger.warning("Reading of this repository is locked")
+            raise BlockingIOError("Reading of {} is locked".format(self.name))
         if not os.path.isdir(self.location):
             self.create_repository()
         self.record = pickle.load(open(self.indexes, "rb"))
         self.upstream = self.record["upstream"]
         self.local = self.record["local"]
+        self.lock_read()
+
+    def save_index(self):
+        logger.info("Saving record.tab to repository")
+        pickle.dump(self.record, open(self.indexes, "wb"))
+
+    def add_upstream(self, name, tups):
+        # Add record of input blocks. 
+        if name not in self.upstream:
+            logger.info("Adding upstream repository to record tab for {}".format(self.name))
+            self.upstream[name] = []
+        for tup in tups:
+            self.upstream[name].append(tup)
 
     # locals indicate records within current task pipelines
     def get_locals(self):
@@ -55,9 +72,6 @@ class Repository:
     def get_upstream(self):
         return self.upstream
 
-    def write_locked(self):
-        return os.path.isfile(self.write_lock)
-
     def read_locked(self):
         return os.path.isfile(self.read_lock)
 
@@ -65,15 +79,8 @@ class Repository:
         if not self.read_locked():
             open(self.read_lock, "w").close()
 
-    def lock_write(self):
-        if not self.write_locked():
-            open(self.write_lock, "w").close()
-
     def unlock_read(self):
         os.remove(self.read_lock)
-
-    def unlock_write(self):
-        os.remove(self.write_lock)
 
     def get_block(self, blockid):
         # blockid: 6 digit string of digit padded with 0.
