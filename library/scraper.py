@@ -3,14 +3,11 @@ import os
 import requests
 import time
 import json
-import time
 import pandas as pd
 import argparse
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
-""" 
+"""
 CORE CLASS DEALING WITH OUTGOING REQUEST AND WEB CONTENT.
 """
 
@@ -25,39 +22,12 @@ class Scraper():
     # Read Config from Json File
     def _parse_config(self):
         config = json.load(open(self.config_path))
-        # print(config)
-        self.selenium = config.get("selenium")
         self.urls = config.get("url")
-        # NESTED CONFIG SOLUTION FOR COMPLEX SCRAPING.
         self.nest = config.get("css_nested")
-        # OFFERS SELENIUM AND JAVASCRIPT SUPPORT FOR INTERACTION.
-        if self.selenium:
-            self.jsaction = config.get("jsaction")
-            self.sleeptime = config.get("sleep_time")
-            if len(self.urls) != self.sleeptime:
-                raise ValueError("Each entree of URL need to have corresponding sleep for selenium")
-            self._selenium()
-        # OFFERS A COMPLIMENTARY PARSER FOR DICTIONARY.
-        if "parse" in config:
-            self.parse = True
-            self.parser_config = config.get("parse")
-            self.table_names = config.get("table_names")
-            self.save = config.get("save")
-            self.savedir = config.get("savedir")
-            self.datadir = config.get("datadir")
-            self.datestr = config.get("datestr")
-        else:
-            self.parse = False
+        self.parser_config = config.get("parse")
 
     def _crawl(self, url, sleeptime = 5):
-        if self.selenium:
-            self.driver.get(url)
-            time.sleep(sleeptime)
-            for each in self.jsaction:
-                self.driver.execute_script(each)
-            html = self.driver.page_source
-        else:
-            html = requests.get(url, headers=Scraper.header).content
+        html = requests.get(url, headers=Scraper.header).content
         soup = BeautifulSoup(html, 'lxml')
         return soup
 
@@ -157,40 +127,8 @@ class Scraper():
 
     def run(self):
         master = self._controller()
-        # print(master)
-        if self.parse:
-            master = self._parse_result(master)
-            if self.save:
-                if self.datadir is None:
-                    raise ValueError("No data path specified")
-                if self.savedir is None:
-                    raise ValueError("No save folder name specified")
-                if self.datestr is None:
-                    self.datestr = ""
-                datestr = datetime.strftime(datetime.now(), self.datestr)
-                dirname = "{}_{}".format(self.savedir, datestr)
-                try:
-                    os.makedirs(os.path.join(self.datadir, dirname))
-                except FileExistsError:
-                    pass
-                for i in range(len(master)):
-                    master[i].to_csv(os.path.join(self.datadir, dirname, self.table_names[i]+".csv"), index=False, encoding='utf-8')
-        else:
-            if __name__ == "__main__":
-                print("Crawl Finished, nothing to do. Dumping dictionary to your screen\n")
-                time.sleep(1)
-                print(master)
-        if self.selenium:
-            self.driver.quit()
+        master = self._parse_result(master)
         return master
-
-    def _selenium(self):
-        options = webdriver.ChromeOptions()
-        options.add_argument('headless')
-        capa = DesiredCapabilities.CHROME
-        capa["pageLoadStrategy"] = "none"
-        self.driver = webdriver.Chrome(chrome_options=options, desired_capabilities=capa)
-        self.driver.set_window_size(1440,900)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pass in the path to the config json file.")
@@ -198,4 +136,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args.config)
     sk = Scraper(args.config)
-    sk.run()
+    master = sk.run()
+    print(master)

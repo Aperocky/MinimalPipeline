@@ -1,6 +1,7 @@
 import configparser as cfg
 import importlib
 import sys
+from common import utility as ut
 from common.repository import Repository
 from common.task import Task
 
@@ -39,7 +40,15 @@ class Launcher:
                     streamrepo["repository"] = Repository(upstream)
                     streamrepo["blocks"] = numblocks
             local_path = config.get("output", "repository_path")
-            self.repos["local"] = Repository(local_path)
+            local_repository = Repository(local_path)
+            self.repos["local"] = local_repository
+
+            # Add upstream when there isn't for local_repo.
+            # This is important as repository can be initiated for first time and not know its upstreams.
+            # And also work if the upstream exists.
+            for key in self.repos["upstream"].keys():
+                local_repoository.add_upstream(key, [])
+            
         except BlockingIOError as e:
             logger.warning("Not all repository are readable, awaiting next execution")
             sys.exit()
@@ -49,19 +58,46 @@ class Launcher:
         # TODO: running files determined on record pickle file.
         if not self.runnable():
             logger.info("Not runnable for this iteration, quitting")
-        pass
+            return
+        self.construct_temp()
+        task_config = self.config.get("source_path", "config_path")
+        try:
+            status = self.task_instance.run(self.input_paths, self.output_path, task_config)
+        except:
+            status = False
+            logger.error("Error was generated while running the task")
+
+        # Manage post task issues.
+        if status:
+            # Update record.tab objects for local
+            local_repo = self.repos["local"]
+            for key, tabs in self.upstream_blocks.items():
+                local_repo.add_upstream(key, tabs)
+            # Copy temp folder into correct place.
+            curr_block = local_repo.create_block()
+            logger.info("Moving created folder into blocks")
+            ut.copy_directory(self.output_path, curr_block, overwrite=True)
+            # Save repository record and unlock it.
+            local_repo.save_index()
+            local_repo.unlock_read()
+        else:
+            logger.warning("Execution deemed flawed, terminating")
+            sys.exit()
 
     def runnable(self):
-        # TODO: extract the record.tab file for each repository.
         # Load local block records.
         local_blocks = self.repos["local"].get_locals()
-        upstream_blocks = self.repos["local"].get_upstream()
+        upstream_records = self.repos["local"].get_upstream()
+
+        upstream_blocks = {}
+        execute = True
 
         for key, val in self.repos["upstream"].items():
+            upstream_blocks[key] = []
             record = val["repository"].get_locals()
             blocksnum = val["blocks"]
             # Corresponding blocks record in the local data repository.
-            local_record = upstream_blocks[key]
+            local_record = upstream_records[key]
             
             # Check for overlapping blocks taken.
             # For now, blocks are only supported to be taken in a serial fashion. No breaks allowed.
@@ -69,8 +105,39 @@ class Launcher:
             if not len(set(record) & set(local_record)) == len(local_record):
                 # Hopefully will never encounter below, for that would be structural.
                 logger.error("There's an inconsistency in blocks registered")
-            
-            
+                raise ValueError("Blocks found to be inconsistent")
 
+            new_blocks = len(record) - len(local_record)
+            start_num = len(local_record)
+            if new_blocks >= blocknum:
+                upstream_blocks[key].extend(record[start_num: startnum+blocksnum])
+            else:
+                logger.warning("Repository {} does not contain enough new blocks to proceed".format(key))
+                execute = False
+                break
+             
+        if execute:
+            self.upstream_blocks = upstream_blocks
+            return True
+        return False
+
+    # Create temporary folder containing the upstream blocks
+    def construct_temp(self):
+        self.input_paths = {}
+        self.output_path = None
+        # Create input paths.
+        for key, blocks in self.upstream_blocks.items():
+            self.input_paths[key] = ut.create_temp_dir()
+            repository = self.repos["upstream"][key]["repository"]
+            for each in blocks:
+                blockid = each[0] # (blockid, timestamp)
+                block_path = repository.get_block(blockid)
+                to_path = os.path.join(self.input_paths[key], blockid)
+                logger.info("Creating block {} from {} in temp directory".format(blockid, key))
+                ut.copy_directory(block_path, to_path)
+        self.output_path = ut.create_temp_dir()
+        # Unlock upstream repositories as they're no longer used.
+        for each in self.repos["upstream"]:
+            each.unlock_read()
 
 

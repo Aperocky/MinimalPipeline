@@ -61,8 +61,7 @@ class Repository:
         if name not in self.upstream:
             logger.info("Adding upstream repository to record tab for {}".format(self.name))
             self.upstream[name] = []
-        for tup in tups:
-            self.upstream[name].append(tup)
+        self.upstream[name].extend(tups)
 
     # locals indicate records within current task pipelines
     def get_locals(self):
